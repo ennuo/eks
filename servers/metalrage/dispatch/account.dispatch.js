@@ -1,15 +1,5 @@
 const NetworkClient = require("../client");
-
-// enum SCENE_TYPE
-// {
-// 	SCENE_SERVER = 0,	// ¼­¹ö¿¬°á´ë±âÁß
-// 	SCENE_WAIT = 1,		// ´ë±âÁß ( µ¥µð¿¡¼­¸¸ »ç¿ë )
-// 	SCENE_ACCOUNT = 2,	// ·Î±×ÀÎ
-// 	SCENE_GATE = 3,		// °ÔÀÌÆ®
-// 	SCENE_LOBBY = 4,	// ·Îºñ
-// 	SCENE_ROOM = 5,		// ´ë±â½Ç
-// 	SCENE_GAME = 6,		// °ÔÀÓ ( Å¬¶óÀÌ¾ðÆ®¿Í µ¥µð µÑ´Ù »ç¿ë )
-// };
+const { MAX_MAP_COUNT, MAX_MECH_COUNT, MAX_SLOT_COUNT } = require('../datatypes/enums');
 
 const CQ_LOGIN_WASABII = 0x00110151;
 const CQ_CREATE = 0x210201;
@@ -19,6 +9,8 @@ const SA_CREATE = 0x210202;
 const SA_LOGIN_AGAIN = 0x110125;
 
 const SN_WAIT = 0x110131;
+const SN_MAP_INFO = 0x210115;
+const SN_LICENSE_INFO = 0x260101;
 
 const SN_DEFAULT_INFO = 0x210101;
 const SN_PLAY_INFO = 0x210102;
@@ -208,21 +200,56 @@ class ZAccountDispatch
 
                 // Mech Level
                 {
-                    const MAX_NUM_MECHS = 8;
                     const MECH_RECORD_SIZE = 0x1c;
 
-                    const [msg, body] = client.getMessageBuffer(SN_MECH_LEVEL, 0x2 + (MECH_RECORD_SIZE * MAX_NUM_MECHS));
+                    const [msg, body] = client.getMessageBuffer(SN_MECH_LEVEL, 0x1 + (MECH_RECORD_SIZE * MAX_MECH_COUNT));
                     let offset = 0;
 
                     // Just set every mech level to 1
-                    body.writeUint16LE(MAX_NUM_MECHS, 0);
-                    for (let i = 0; i < MAX_NUM_MECHS; ++i)
+                    body[offset++] = MAX_MECH_COUNT;
+                    for (let i = 0; i < MAX_MECH_COUNT; ++i)
                     {
-                        body.writeUint32LE((i + 1), offset);
-                        body.writeUint32LE(1, offset + 4);
+                        body.writeUint32LE(i + 1, offset); // Type
+                        body.writeUint32LE(1, offset + 4); // Level
+                        body.writeBigUint64LE(0n, offset + 8); // Exp
+                        body.writeUint32LE(0, offset + 16); // Kill
+                        body.writeUint32LE(0, offset + 20); // Death
+                        body.writeUint32LE(0, offset + 24); // Sally
+
                         offset += MECH_RECORD_SIZE;
                     }
 
+                    client.send(msg);
+                }
+
+                // Map Info
+                {
+                    const [msg, body] = client.getMessageBuffer(SN_MAP_INFO, 0x2 + (4 * MAX_MAP_COUNT));
+                    let offset = 0;
+
+                    // Just set every mech level to 1
+                    body[offset++] = 0x00;
+                    body[offset++] = MAX_MAP_COUNT;
+                    for (let i = 0; i < MAX_MAP_COUNT; ++i, offset += 4)
+                        body.writeUint32LE(i, offset); // Index
+                    
+                    client.send(msg);
+                }
+
+                // License info
+                {
+                    const [msg, body] = client.getMessageBuffer(SN_LICENSE_INFO, 0x2 + (9 * MAX_SLOT_COUNT));
+                    let offset = 0;
+
+                    // Just set every mech level to 1
+                    body[offset++] = 0x00;
+                    body[offset++] = MAX_SLOT_COUNT;
+                    for (let i = 0; i < MAX_SLOT_COUNT; ++i, offset += 9)
+                    {
+                        body.writeUint32LE(i + 1, offset); // Mech Type
+                        body.writeUint32LE(1, offset + 5); // type, gets remapped, so 1 is purchased, 2 is tutorial, 0 is none
+                    }
+                    
                     client.send(msg);
                 }
 
